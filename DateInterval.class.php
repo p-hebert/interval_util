@@ -18,36 +18,45 @@ class Date_Interval extends Interval{
     }
     
     public function setStart($date){
-        $isdate = self::toDateTime($date);
-        if($isdate !== false){
-            $this->start = $date;
-            return true;
+        $datetime = self::toDateTime($date);
+        if(isset($this->end)){
+            if($datetime !== false && $this->end > $datetime){
+                $this->start = $datetime;
+                return true;
+            }else{
+                return false;
+            }
         }else{
-            return false;
+            if($datetime !== false){
+                $this->start = $datetime;
+                return true;
+            }else{
+                return false;
+            }
         }
     }
     
     public function setEnd($date){
         $datetime = self::toDateTime($date);
-        if($datetime !== false){
-            $this->end = $datetime;
-            return true;
+        if(isset($this->start)){
+            if($datetime !== false && $this->start < $datetime){
+                $this->end = $datetime;
+                return true;
+            }else{
+                return false;
+            }
         }else{
-            return false;
+            if($datetime !== false){
+                $this->end = $datetime;
+                return true;
+            }else{
+                return false;
+            }
         }
     }
     
     public function getIntervalLength(){
         return date_diff($this->start, $this->end);
-    }
-    
-    public static function intervalToArray(Date_Interval $date_interval){
-        $array = [];
-        $array[] = $date_interval->start;
-        $array[] = $date_interval->end;
-        if(isset($date_interval->data)){
-            $array[] = $date_interval->data;
-        }
     }
     
     private static function toDateTime($date){

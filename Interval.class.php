@@ -22,7 +22,7 @@ class Interval implements Comparable{
         $this->start = $start;
         $this->end = $end;
         $this->data = $data;
-        $this->data_type = static::getType($data);
+        $this->data_type = self::getType($data);
     }
     
     public function getStart(){
@@ -31,7 +31,10 @@ class Interval implements Comparable{
     
     public function setStart($start){
         if(isset($this->end)){
-            if(static::getType($start) === static::getType($this->end)){
+            $getTypeStart = self::getType($start);
+            if($getTypeStart === self::getType($this->end) 
+               && ($getTypeStart !== '' || $getTypeStart !== 'unknown type')
+               && $start < $this->end){
                 $this->start = $start;
                 return true;
             }else{
@@ -49,7 +52,10 @@ class Interval implements Comparable{
     
     public function setEnd($end){
         if(isset($this->start)){
-            if(static::getType($end) === static::getType($this->start)){
+            $getTypeEnd = self::getType($end);
+            if($getTypeEnd === self::getType($this->start)
+               && ($getTypeEnd !== '' || $getTypeEnd !== 'unknown type')
+               && $end > $this->start){
                 $this->end = $end;
                 return true;
             }else{
@@ -71,11 +77,53 @@ class Interval implements Comparable{
     
     public function setData($data){
         $this->data = $data;
-        $this->data_type = static::getType($data);
+        $this->data_type = self::getType($data);
     }
     
     public function compareTo(self $a) {
         return self::compare($this, $a);
+    }
+    
+    /**
+     * Verifies if the variable is an Interval.
+     * @param $var
+     * @return boolean
+     */
+    public final static function isInterval($var){
+        $type = self::getType($var);
+        if($type === 'object' && $var instanceof Interval){
+            return true;
+        }elseif($type === 'array' && self::isIntervalToArray($var)){
+            return true;
+        }else{
+            return false;
+        }
+    }
+    
+    public final static function intervalToArray(Interval $interval){
+        $array = [];
+        $array[] = $interval->start;
+        $array[] = $interval->end;
+        if(isset($interval->data)){
+            $array[] = $interval->data;
+        }
+    }
+    
+    public static function arrayToInterval($array){
+        if(self::isIntervalToArray($array)){
+            if(count($array) == 3){
+                return new static($array[0], $array[1], $array[2]); 
+            }else{
+                return new static($array[0], $array[1]);
+            }   
+        }else{
+            return false;
+        }
+    }
+    
+    private final static function isIntervalToArray($var){
+        return (count($var) < 4 && count($var) > 1) && (self::getType($var[0]) === self::getType($var[0]) 
+                && (self::getType($var[0]) !== '' || self::getType($var[0]) !== 'unknown type'));
     }
     
     /**
@@ -85,7 +133,7 @@ class Interval implements Comparable{
      * @param bool $return_class If true returns the class of an object.
      * @return string
      */
-    protected static function getType($var, $return_class = false){
+    protected final static function getType($var, $return_class = false){
         $type = gettype($var);
         if($type === 'NULL'){
             return '';
@@ -110,6 +158,22 @@ class Interval implements Comparable{
         }else{
             return 1;
         }
+    }
+    
+    public static function compareArrIntervals($a, $b){
+        if($a[0] < $b[0]){
+                return -1;
+            }elseif($a[0] == $b[0]){
+                if($a[1] < $b[1]){
+                    return -1;
+                }elseif($a[1] == $b[1]){
+                    return 0;
+                }else{
+                    return 1;
+                }
+            }else{
+                return 1;
+            }
     }
 }
 

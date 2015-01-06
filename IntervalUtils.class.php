@@ -1,10 +1,11 @@
 <?php
-
+ include_once 'Interval.class.php';
 
 /**
  * Interval Utilities, including sorting, union of one set, intersection of tw and max & min date 
  */
 class IntervalUtils{
+    
     /**
      * Creates the $interval variable to pass to getUsersHistory()
      * Finds the largest interval during which an user was under a certain reporter, using first date under and last date under
@@ -24,22 +25,20 @@ class IntervalUtils{
      * ]
      * @return mixed[][] $g_intervals
      */
-    public static function getGlobalIntervals($users_intervals){
-        $g_intervals = [];
-        foreach($users_intervals as $key=>$date_intervals){
-            $min = '3000-00-00';
-            $max = '0000-00-00';
-            foreach($date_intervals as $range){
-                if($range[1] < $min){
-                    $min = $range[1];
-                }
-                if($range[2] > $max){
-                    $max = $range[2];
-                }
-            } 
-            $g_intervals[] = [$key, $min, $max];
-        }    
-        return $g_intervals;
+    public static function getExtremums($interval_set, $are_arrays = false){
+        if(!count($interval_set)){
+            return [];
+        }
+        $ordered_set = self::orderIntervalSet($interval_set, $are_arrays);
+        if(!$are_arrays){
+            $min = $interval_set[0]->getStart();
+            $max = $interval_set[count($interval_set) - 1]->getEnd();
+            return new Interval($min, $max);
+        }else{
+            $min = $interval_set[0][0];
+            $max = $interval_set[count($interval_set) - 1][1];
+            return [$min, $max];
+        }
     }
 
     /**
@@ -47,64 +46,72 @@ class IntervalUtils{
      * @param string dates [][] $intervals
      * @return string dates [][] $intervals
      */
-    public static function orderIntervalList($intervals){
+    public static function orderIntervalSet($interval_set, $are_arrays = false){
+        if(!count($interval_set)){
+            return [];
+        }
         //To optimize on average the quicksort time (usort() is a quicksort)
-        shuffle($intervals);
-
-        usort($intervals, function ($interval1, $interval2){
-            if($interval1[0] < $interval2[0]){
-                return -1;
-            }elseif($interval1[0] == $interval2[0]){
-                if($interval1[1] < $interval2[1]){
-                    return -1;
-                }elseif($interval1[1] == $interval2[1]){
-                    return 0;
-                }else{
-                    return 1;
-                }
-            }else{
-                return 1;
-            }
-        });
-
-        return $intervals;
+        shuffle($interval_set);
+        
+        if(!$are_arrays){
+            usort($interval_set, Interval::compare($a, $b));
+        }else{
+            usort($interval_set, Interval::compareArrIntervals($a, $b));
+        }
+        return $interval_set;
     }
+    
+    
 
     /**
      * Returns the union of consecutive or overlapping intervals.
      * @param string date [][2] $intervals
      * @return string date [][2] $unioned
      */
-    public static function unionIntervals($intervals, $is_sorted){          
-        if(!count($intervals)){
+    public static function unionIntervals($interval_set1, $interval_set2, $first_is_sorted, $second_is_sorted, $are_arrays = false){          
+        //Dealing with union of empty sets
+        if(!count($interval_set1) && !count($interval_set2)){
             return [];
+        }elseif(!count($interval_set1)){
+            return $interval_set2;
+        }elseif(!count($interval_set2)){
+            return $interval_set1;
         }
-        if(!$is_sorted){
-            $sorted = self::orderIntervalList($intervals);
+        
+        //Sorting interval sets
+        if(!$first_is_sorted){
+            $ordered_set1 = self::orderIntervalSet($interval_set1, $are_arrays);
         }else{
-            $sorted = $intervals;
+            $ordered_set1 = $interval_set1;
+        }
+        
+        if(!$second_is_sorted){
+            $ordered_set2 = self::orderIntervalSet($interval_set2, $are_arrays);
+        }else{
+            $ordered_set2 = $interval_set2;
         }
 
-        $unioned = [$sorted[0]];
+        $union_set = [$ordered_set[0]];
         $index = 0;
 
-        for($i = 0 ; $i < count($sorted) ; $i++){
-            if($unioned[$index][1] < $sorted[$i][0]){
-                $current = new DateTime($unioned[$index][1]);
-                $current->add(new DateInterval('P1D'));
-                $next = new DateTime($sorted[$i][0]);
-                //checking for consecutive intervals
-                if($current == $next){
-                    $unioned[$index][1] = $sorted[$i][1];
-                }else{
-                    $unioned[] = $sorted[$i];
+        for($i = 0 ; $i < count($ordered_set) ; $i++){
+            if(!$are_arrays){
+                if($union_set[$index]->getEnd() < $ordered_set[$i]->getStart()){
+                    $union_set[] = $ordered_set[$i];
                     $index++;
+                }elseif($union_set[$index]->getEnd() < $ordered_set[$i]->getEnd()){
+                    $union_set[$index]->setEnd($ordered_set[$i]->getEnd());
                 }
-            }elseif($unioned[$index][1] < $sorted[$i][1]){
-                $unioned[$index][1] = $sorted[$i][1];
+            }else{
+                if($union_set[$index][1] < $ordered_set[$i][0]){
+                    $union_set[] = $ordered_set[$i];
+                    $index++;
+                }elseif($union_set[$index][1] < $ordered_set[$i][1]){
+                    $union_set[$index][1] = $ordered_set[$i][1];
+                }
             }
         }
-        return $unioned;
+        return $union_set;
     }
 
 
@@ -117,10 +124,10 @@ class IntervalUtils{
         }
 
         if(!$master_is_sorted){
-            $masters = self::orderIntervalList($masters);
+            $masters = self::orderIntervalSet($masters);
         }
         if(!$slave_is_sorted){
-            $slaves = self::orderIntervalList($slaves);
+            $slaves = self::orderIntervalSet($slaves);
         }
         $intersect = [];
         foreach($masters as $master){
