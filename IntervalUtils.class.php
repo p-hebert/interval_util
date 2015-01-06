@@ -2,28 +2,22 @@
  include_once 'Interval.class.php';
 
 /**
- * Interval Utilities, including sorting, union of one set, intersection of tw and max & min date 
+ * Library of set operations for Interval sets
+ * The $are_arrays parameter specifies whether the programmer uses arrays of
+ * [start, end, data = null] or arrays of objects instanciating Interval.class.php as parameters.
+ * All of these methods will provoke loss of any $data field that may be associated 
+ * to the Interval objects. 
+ * You are most welcome to modify this for your own purposes and add your
+ * own logic rules such as using the data field as a second dimension for your
+ * set operations.
  */
 class IntervalUtils{
     
     /**
-     * Creates the $interval variable to pass to getUsersHistory()
-     * Finds the largest interval during which an user was under a certain reporter, using first date under and last date under
-     * Disregards any gaps between the max and min where the user was not under the reporter, since it would otherwise
-     * discard some important data when querying.
-     * @param mixed[][][] $users_intervals The result from buildTimeIntervals() or any array of the form
-     * [
-     *  ...
-     *   int index $user_id 
-     *    [
-     *     ...[
-     *          int $reporter
-     *          string date $start_date
-     *          string date $end_date
-     *        ]...
-     *    ]...
-     * ]
-     * @return mixed[][] $g_intervals
+     * Returns the extremums of a set of Intervals
+     * @param interval array\array of Interval $interval_set
+     * @param boolean $are_arrays
+     * @return single interval array\Interval
      */
     public static function getExtremums($interval_set, $are_arrays = false){
         if(!count($interval_set)){
@@ -42,9 +36,11 @@ class IntervalUtils{
     }
 
     /**
-     * Sorts an interval array, assuming dates are in the same format.
-     * @param string dates [][] $intervals
-     * @return string dates [][] $intervals
+     * Sorts an array of intervals.
+     * Based on PHP usort (Implemented as a quicksort in C).
+     * @param interval array\Interval.class array $interval_set
+     * @param boolean $are_arrays
+     * @return interval array\Interval.class array
      */
     public final static function orderIntervalSet($interval_set, $are_arrays = false){
         if(!count($interval_set)){
@@ -61,6 +57,13 @@ class IntervalUtils{
         return $interval_set;
     }
     
+    /**
+     * Union of a set over itself. Overlapping intervals are merged together.
+     * @param interval array\Interval.class array $interval_set
+     * @param boolean $is_ordered
+     * @param boolean $are_arrays
+     * @return interval array\Interval.class array
+     */
     public static function reflexiveUnion($interval_set, $is_ordered, $are_arrays = false){
         //Dealing with union of empty sets
         if(!count($interval_set)){
@@ -76,7 +79,10 @@ class IntervalUtils{
         
         $union_set = [$ordered_set[0]];
         $index = 0;
-
+        
+        //Checks if $ordered_set[$i] overlaps with $union_set[$index]
+        //If yes, extends the length of the $union_set[$index]
+        //If not, create a new entry in $union_set.
         for($i = 0 ; $i < count($ordered_set) ; $i++){
             if(!$are_arrays){
                 if($union_set[$index]->getEnd() < $ordered_set[$i]->getStart()){
@@ -97,11 +103,13 @@ class IntervalUtils{
         return $union_set;
     }
 
-    /**
-     * Returns the union of consecutive or overlapping intervals.
-     * @param string date [][2] $intervals
-     * @return string date [][2] $unioned
-     */
+   /**
+    * Returns the union of two sets
+    * @param interval array\Interval.class array $master
+    * @param interval array\Interval.class array $slave
+    * @param boolean $are_arrays
+    * @return interval array\Interval.class array $unioned_set
+    */
     public static function union($master, $slave, $are_arrays = false){          
         //Dealing with union of empty sets
         if(!count($master) && !count($slave)){
@@ -119,6 +127,16 @@ class IntervalUtils{
         return self::reflexiveUnion($master, false);   
     }   
 
+    /**
+     * Returns the reflexively unioned intersection of the $master and $slave sets.
+     * Method will sort $master/$slave if the parameters *_is_sorted is false.
+     * @param interval array\Interval.class array $master
+     * @param boolean $master_is_sorted
+     * @param interval array\Interval.class array $slave
+     * @param boolean $slave_is_sorted
+     * @param boolean $are_arrays
+     * @return interval array\Interval.class array $union_set
+     */
     public static function intersect($master, $master_is_sorted, $slave, $slave_is_sorted, $are_arrays = false){
         //Intersection of empty sets
         if(!count($master)){ 
@@ -197,7 +215,19 @@ class IntervalUtils{
         return $union_set;
     }
     
-    //suggested that sets be cleaned by using reflexiveUnion first. Will reduce the amount of calculations.
+    /**
+     * Returns {e : e element of $master && e ! element of $slave}
+     * $master and $slave need to be ordered and unioned before difference is done.
+     * Runs in O(n^4) as it relies on differenceOnSingleInterval() which runs in O(n^3).
+     * @param interval array\Interval.class array $master
+     * @param boolean $m_ordered
+     * @param boolean $m_unioned
+     * @param interval array\Interval.class array $slave
+     * @param boolean $s_ordered
+     * @param boolean $s_unioned
+     * @param boolean $are_arrays
+     * @return interval array\Interval.class array $difference
+     */
     public static function difference($master, $m_ordered, $m_unioned, $slave, $s_ordered, $s_unioned, $are_arrays = false){
         //Difference of empty sets
         if(!count($master)){ 
@@ -233,6 +263,16 @@ class IntervalUtils{
         return $difference;
     }
     
+    /**
+     * Returns the difference of a single interval and a set of intervals.
+     * Returns {e : e element of $master && e ! element of $slave}
+     * Runs in O(n^3) since intersects all the difference obtained in the first loop
+     * and intersect() runs already in O(n^2). 
+     * @param interval array\Interval.class array $master
+     * @param interval array\Interval.class array $slave
+     * @param boolean $are_arrays
+     * @return boolean\single interval array\Interval.class object
+     */
     private static function differenceOnSingleInterval($master, $slave, $are_arrays){
         $diff = [];
         
@@ -257,7 +297,23 @@ class IntervalUtils{
                     }
                 }
             }else{
-
+                $minStart = $master[0];
+                $maxEnd = $master[1];
+                if($slave[$i][0] > $minStart){
+                    if($slave[$i][1] < $maxEnd){
+                        $diff[$i][] = [$minStart, $slave[$i][1]];
+                        $diff[$i][] = [$slave[$i][1], $maxEnd];
+                    }else{
+                        $diff[$i][] = [$minStart, $slave[$i][0]];
+                    }
+                }else{
+                    if($slave[$i][1] < $maxEnd){
+                        $diff[$i][] = [$slave[$i][1], $maxEnd];
+                    }else{
+                        //$s covers the whole of $m, nothing is left.
+                        return false;
+                    }
+                }
             }
         }
         //Intersect all the intervals obtained in order to simulate the difference 
@@ -276,6 +332,15 @@ class IntervalUtils{
         return $diff[count($diff) - 1];
     }
     
+    /**
+     * Returns {e : e is element of $master xor $slave}
+     * @param interval array\Interval.class array $master
+     * @param boolean $master_is_ordered
+     * @param interval array\Interval.class array $slave
+     * @param boolean $slave_is_ordered
+     * @param boolean $are_arrays
+     * @return interval array\Interval.class array $difference
+     */
     public static function symmetricDifference($master, $master_is_ordered, $slave, $slave_is_ordered, $are_arrays = false){
         $union = static::union($master, $slave, $are_arrays);
         $intersection = static::intersection($master, $master_is_ordered, $slave, $slave_is_ordered, $are_arrays);

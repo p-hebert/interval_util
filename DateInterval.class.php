@@ -1,6 +1,10 @@
 <?php
 require_once 'Interval.class.php';
 require_once 'Comparable.interface.php';
+
+/**
+ * A Date-based implementation of Interval
+ */
 class Date_Interval extends Interval{
     private $start;
     private $end;
@@ -17,6 +21,11 @@ class Date_Interval extends Interval{
         super($start, $end, $data);
     }
     
+    /**
+     * Mutator of startpoint
+     * @param type $start
+     * @return boolean
+     */
     public function setStart($date){
         $datetime = self::toDateTime($date);
         if(isset($this->end)){
@@ -36,6 +45,11 @@ class Date_Interval extends Interval{
         }
     }
     
+    /**
+     * Mutator of endpoint
+     * @param type $end
+     * @return boolean
+     */
     public function setEnd($date){
         $datetime = self::toDateTime($date);
         if(isset($this->start)){
@@ -55,10 +69,20 @@ class Date_Interval extends Interval{
         }
     }
     
+    /**
+     * Returns the length of the Date_Interval as a PHP DateInterval object
+     * @return type
+     */
     public function getIntervalLength(){
         return date_diff($this->start, $this->end);
     }
     
+    /**
+     * Converts the parameter to a DateTime object if it is a date.
+     * Returns false otherwise
+     * @param type $date
+     * @return boolean\DateTime
+     */
     private static function toDateTime($date){
         $type = self::isADate($date);
         if($type === false){
@@ -76,6 +100,13 @@ class Date_Interval extends Interval{
         }
     }
     
+    /**
+     * Verifies if the parameter is a well formated date.
+     * Can receive a string for following the Apache Date and Time Format,
+     * a timestamp or a DateTime object.
+     * @param DateTime $date
+     * @return boolean
+     */
     private static function isADate($date){
         $date_type = self::getType($date);
         if($date_type === ''){
