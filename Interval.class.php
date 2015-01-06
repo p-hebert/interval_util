@@ -84,6 +84,7 @@ class Interval implements Comparable{
         return self::compare($this, $a);
     }
     
+    //TYPING METHODS-------------------------------------------------------------------------------------------------------
     /**
      * Verifies if the variable is an Interval.
      * @param $var
@@ -144,6 +145,7 @@ class Interval implements Comparable{
         }
     }
     
+    //COMPARISON METHODS---------------------------------------------------------------------------------------------------
     public static function compare(self $a, self $b) {
         if($a->getStart() < $b->getStart()){
             return -1;
@@ -174,6 +176,16 @@ class Interval implements Comparable{
             }else{
                 return 1;
             }
+    }
+    
+    public static function areIntersecting($a, $b , $are_arrays = false){
+        if(!$are_arrays && ($a->getEnd() > $b->getStart() || $b->getEnd() > $a->getStart())){
+            return true;
+        }elseif($are_arrays && ($a[1] > $b[0] || $b[1] > $a[0])){
+            return true;
+        }else{
+            return false;
+        }
     }
 }
 

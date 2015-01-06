@@ -46,7 +46,7 @@ class IntervalUtils{
      * @param string dates [][] $intervals
      * @return string dates [][] $intervals
      */
-    public static function orderIntervalSet($interval_set, $are_arrays = false){
+    public final static function orderIntervalSet($interval_set, $are_arrays = false){
         if(!count($interval_set)){
             return [];
         }
@@ -61,36 +61,19 @@ class IntervalUtils{
         return $interval_set;
     }
     
-    
-
-    /**
-     * Returns the union of consecutive or overlapping intervals.
-     * @param string date [][2] $intervals
-     * @return string date [][2] $unioned
-     */
-    public static function unionIntervals($interval_set1, $interval_set2, $first_is_sorted, $second_is_sorted, $are_arrays = false){          
+    public static function reflexiveUnion($interval_set, $is_ordered, $are_arrays = false){
         //Dealing with union of empty sets
-        if(!count($interval_set1) && !count($interval_set2)){
+        if(!count($interval_set)){
             return [];
-        }elseif(!count($interval_set1)){
-            return $interval_set2;
-        }elseif(!count($interval_set2)){
-            return $interval_set1;
         }
         
         //Sorting interval sets
-        if(!$first_is_sorted){
-            $ordered_set1 = self::orderIntervalSet($interval_set1, $are_arrays);
+        if(!$is_ordered){
+            $ordered_set = self::orderIntervalSet($interval_set, $are_arrays);
         }else{
-            $ordered_set1 = $interval_set1;
+            $ordered_set = $interval_set;
         }
         
-        if(!$second_is_sorted){
-            $ordered_set2 = self::orderIntervalSet($interval_set2, $are_arrays);
-        }else{
-            $ordered_set2 = $interval_set2;
-        }
-
         $union_set = [$ordered_set[0]];
         $index = 0;
 
@@ -114,51 +97,113 @@ class IntervalUtils{
         return $union_set;
     }
 
-
-    public static function intersectIntervals($masters, $master_is_sorted, $slaves, $slave_is_sorted){
-        //Intersection of empty sets
-        if(!count($masters)){ 
+    /**
+     * Returns the union of consecutive or overlapping intervals.
+     * @param string date [][2] $intervals
+     * @return string date [][2] $unioned
+     */
+    public static function union($master, $slave, $are_arrays = false){          
+        //Dealing with union of empty sets
+        if(!count($master) && !count($slave)){
             return [];
-        }elseif(!count($slaves)){
+        }elseif(!count($master)){
+            return $slave;
+        }elseif(!count($slave)){
+            return $master;
+        }
+        
+        foreach($slave as $interval){
+            $master[] = $interval;
+        }
+        
+        return self::reflexiveUnion($master, false);   
+    }   
+
+    public static function intersect($master, $master_is_sorted, $slave, $slave_is_sorted, $are_arrays = false){
+        //Intersection of empty sets
+        if(!count($master)){ 
+            return [];
+        }elseif(!count($slave)){
             return []; 
         }
 
         if(!$master_is_sorted){
-            $masters = self::orderIntervalSet($masters);
+            $master = self::orderIntervalSet($master);
         }
         if(!$slave_is_sorted){
-            $slaves = self::orderIntervalSet($slaves);
+            $slave = self::orderIntervalSet($slave);
         }
-        $intersect = [];
-        foreach($masters as $master){
-            foreach($slaves as $slave){
-                $maxStart = $master[0];
-                $minEnd = $master[1];
-                if($master[0] >= $slave[1] || $master[1] <= $slave[0]){
-                    //then no intersection\
-                    continue;
-                }elseif($master[0] > $slave[0] && $master[1] < $slave[1]){
-                    //then intersection is [ $master[0] , $master[1] ]
-                    //don't do anything
-                }else{
-                    if($master[0] < $slave[0]){
-                        if($master[1] < $slave[1]){
-                            $maxStart = $slave[0];
-                        }else{
-                            $maxStart = $slave[0];
-                            $minEnd = $slave[1];
+        $intersect_set = [];
+        foreach($master as $m){
+            foreach($slave as $s){
+                if(!$are_arrays){
+                    $maxStart = $m->getStart();
+                    $minEnd = $m->getEnd();
+                    if($m->getStart() >= $s->getEnd() || $m->getEnd() <= $s->getStart()){
+                        //then no intersection
+                        continue;
+                  //}elseif($m->getStart() > $->getStart() && $m->getEnd() < $s->getEnd()){
+                        //then intersection is [ $master->getStart() , $master->getEnd() ]
+                        //don't do anything
+                    }else{
+                        if($m->getStart() < $s->getStart()){
+                            if($m->getEnd() < $s->getEnd()){
+                                $maxStart = $s->getStart();
+                            }else{
+                                $maxStart = $s->getStart();
+                                $minEnd = $s->getEnd();
+                            }
+                        }elseif($m->getEnd() > $s->getEnd()){
+                            $minEnd = $s->getEnd();
                         }
-                    }elseif($master[1] > $slave[1]){
-                        $minEnd = $slave[1];
                     }
-                }
-                $intersect[] = [$maxStart, $minEnd]; 
-                if($maxStart == $master[0] && $minEnd == $master[1]){
-                    break;
+                    $intersect_set[] = new Interval($maxStart, $minEnd);
+                    //Then the m interval has a complete match in the slave intervals. No need to check for more intersection.
+                    if($maxStart == $m->getStart() && $minEnd == $m->getEnd()){
+                        break;
+                    }
+                }else{
+                    $maxStart = $m[0];
+                    $minEnd = $m[1];
+                    if($m[0] >= $s[1] || $m[1] <= $s[0]){
+                        //then no intersection\
+                        continue;
+                  //}elseif($m[0] > $[0] && $m[1] < $s[1]){
+                        //then intersection is [ $master[0] , $master[1] ]
+                        //don't do anything
+                    }else{
+                        if($m[0] < $s[0]){
+                            if($m[1] < $s[1]){
+                                $maxStart = $s[0];
+                            }else{
+                                $maxStart = $s[0];
+                                $minEnd = $s[1];
+                            }
+                        }elseif($m[1] > $s[1]){
+                            $minEnd = $s[1];
+                        }
+                    }
+                    $intersect_set[] = [$maxStart, $minEnd];
+                    //Then the m interval has a complete match in the slave intervals. No need to check for more intersection.
+                    if($maxStart == $m[0] && $minEnd == $m[1]){
+                        break;
+                    }
                 }
             } 
         }
-        $unioned = self::unionIntervals($intersect, false);
-        return $unioned;
+        
+        //cleaning up the set
+        $union_set = self::reflexiveUnion($intersect_set, false, $are_arrays);
+        return $union_set;
+    }
+    
+    public static function difference($master, $slave){
+        
+    }
+    
+    public static function symmetricDifference($master, $master_is_ordered, $slave, $slave_is_ordered, $are_arrays = false){
+        $union = static::union($master, $slave, $are_arrays);
+        $intersection = static::intersection($master, $master_is_ordered, $slave, $slave_is_ordered, $are_arrays);
+        return static::difference($union, $intersection);
     }
 }
