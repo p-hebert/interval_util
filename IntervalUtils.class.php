@@ -128,10 +128,10 @@ class IntervalUtils{
         }
 
         if(!$master_is_sorted){
-            $master = self::orderIntervalSet($master);
+            $master = self::orderIntervalSet($master, $are_arrays);
         }
         if(!$slave_is_sorted){
-            $slave = self::orderIntervalSet($slave);
+            $slave = self::orderIntervalSet($slave, $are_arrays);
         }
         $intersect_set = [];
         foreach($master as $m){
@@ -197,8 +197,83 @@ class IntervalUtils{
         return $union_set;
     }
     
-    public static function difference($master, $slave){
+    //suggested that sets be cleaned by using reflexiveUnion first. Will reduce the amount of calculations.
+    public static function difference($master, $m_ordered, $m_unioned, $slave, $s_ordered, $s_unioned, $are_arrays = false){
+        //Difference of empty sets
+        if(!count($master)){ 
+            return [];
+        }elseif(!count($slave)){
+            return $master; 
+        }
+
+        if(!$m_ordered){
+            $master = self::orderIntervalSet($master, $are_arrays);
+        }
+        if(!$m_unioned){
+            $master = self::reflexiveUnion($master, true, $are_arrays);
+        }
+        if(!$s_ordered){
+            $slave = self::orderIntervalSet($slave, $are_arrays);
+        }
+        if(!$s_unioned){
+            $slave = self::reflexiveUnion($slave, true, $are_arrays);
+        }
         
+        $difference = [];
+        //Does the difference on each $master interval $m one at a time.
+        foreach($master as $m){
+            $diff = self::differenceOnSingleInterval($m, $slave, $are_arrays);
+            if($diff !== false){
+                foreach($diff as $interval){
+                    $difference[] = $interval;
+                }
+            }   
+        }
+        
+        return $difference;
+    }
+    
+    private static function differenceOnSingleInterval($master, $slave, $are_arrays){
+        $diff = [];
+        
+        //Adds 1 to 2 intervals at the index $i depending on how the $slave[$i] overlaps with the $master interval.
+        for($i = 0; $i < count($slave); $i++){
+            if(!$are_arrays){
+                $minStart = $master->getStart();
+                $maxEnd = $master->getEnd();
+                if($slave[$i]->getStart() > $minStart){
+                    if($slave[$i]->getEnd() < $maxEnd){
+                        $diff[$i][] = new Interval($minStart, $slave[$i]->getStart());
+                        $diff[$i][] = new Interval($slave[$i]->getEnd(), $maxEnd);
+                    }else{
+                        $diff[$i][] = new Interval($minStart, $slave[$i]->getStart());
+                    }
+                }else{
+                    if($slave[$i]->getEnd() < $maxEnd){
+                        $diff[$i][] = new Interval($slave[$i]->getEnd(), $maxEnd);
+                    }else{
+                        //$s covers the whole of $m, nothing is left.
+                        return false;
+                    }
+                }
+            }else{
+
+            }
+        }
+        //Intersect all the intervals obtained in order to simulate the difference 
+        //of the $slave intervals on the master interval.
+        for($i = 0; $i < count($diff) ; $i++){
+            //Take the previous index, intersect with current and save in current
+            //allows to intersect multiple sets over the full iteration of the loop.
+            //(commutativity of intersection)
+            if(isset($diff[$i - 1])){
+                $diff[$i] = static::intersect($diff[$i], false, $diff[$i-1], false, $are_arrays);
+                if(empty($diff[$i])){
+                    return false;
+                }
+            }
+        }
+        return $diff[count($diff) - 1];
     }
     
     public static function symmetricDifference($master, $master_is_ordered, $slave, $slave_is_ordered, $are_arrays = false){
